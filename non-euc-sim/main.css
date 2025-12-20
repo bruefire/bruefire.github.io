@@ -1,0 +1,89 @@
+@charset "UTF-8";
+
+body{
+	margin:0;
+	background-color:#eee;
+	overflow:hidden;
+	position:relative;
+}
+#whole{
+}
+#info{
+	position:fixed;
+	bottom:0;
+	right:0;
+	padding:5pt;
+	font-size:9pt;
+}
+
+#canvas2d{
+	z-index:1;
+	position:absolute;
+	top:0;
+	left:0;
+	bottom:0;
+	right:0;
+}
+#glcanvas{
+	z-index:0;
+	position:relative;
+	top:0;
+	left:0;
+}
+
+
+/*******************************/
+	.navbar-inverse .navbar-nav>li>a{
+		font-size:22pt;
+	}
+	#sideMenu{
+		background: rgba(0, 0, 0, 0.5);
+		position:fixed;
+		left:0;
+		top:0;
+		z-index:2;
+	}
+
+	nav.sidebar.navbar {
+		border-radius: 0px;
+	}
+
+	nav.sidebar, .main{
+		-webkit-transition: margin 200ms ease-out;
+	    -moz-transition: margin 200ms ease-out;
+	    -o-transition: margin 200ms ease-out;
+	    transition: margin 200ms ease-out;
+	}
+
+	/* .....NavBar: Fully showing nav bar..... */
+
+	/* @media (min-width: 1330px) { */
+
+		/* /*Allow main to be next to Nav*/ */
+		/* .main{ */
+			/* width: calc(100% - 200px); /*keeps 100% minus nav size*/ */
+			/* margin-left: 200px; */
+		/* } */
+
+		/* /*Show all nav*/ */
+		/* nav.sidebar{ */
+			/* margin-left: 0px; */
+			/* float: left; */
+		/* } */
+		/* /*Show hidden items on nav*/ */
+		/* nav.sidebar .forAnimate{ */
+			/* opacity: 1; */
+		/* } */
+	/* } */
+
+	nav.sidebar .navbar-nav .open .dropdown-menu>li>a:hover, nav.sidebar .navbar-nav .open .dropdown-menu>li>a:focus {
+		color: #CCC;
+		background-color: transparent;
+	}
+
+	nav:hover .forAnimate{
+		opacity: 1;
+	}
+	section{
+		padding-left: 15px;
+	}

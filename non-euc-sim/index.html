@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Contest-Script-Type" content="text/javascript">
+<meta name="viewport" content="width=device-width">
+<title>超球面空間シミュレーター</title>
+<link rel="shortcut icon" href="mora.ico">
+<Link rel="stylesheet" href="main.css" type="text/css">
+<script type="text/javascript" src="obj.js"></script>
+<script type="text/javascript" src="engine.js"></script>
+<script type="text/javascript" src="function.js"></script>
+<script type="text/javascript" src="index.js"></script>
+<script type="text/javascript" src="action.js"></script>
+
+<!--bootstrap-->
+<script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+<link href="//netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+<script src="//netdna.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<!--bootstrap-->
+<script src='glm-js.min.js'></script>
+<script>
+  console.log('loaded glm-js version: ', glm.version);
+  console.log('vec3 example: ', glm.vec3(1,2,3));
+</script>
+<style type="text/css">
+</style>
+</head>
+
+<body>
+
+
+<nav id="sideMenu" class="navbar navbar-inverse sidebar" role="navigation">
+    <div class="container-fluid">
+		<!-- Brand and toggle get grouped for better mobile display -->
+		<div class="navbar-header">
+			<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-sidebar-navbar-collapse-1">
+				<span class="sr-only">Toggle navigation</span>
+				<span class="icon-bar"></span>
+				<span class="icon-bar"></span>
+				<span class="icon-bar"></span>
+			</button>
+			<a class="navbar-brand" href="#">Menu</a>
+		</div>
+		<!-- Collect the nav links, forms, and other content for toggling -->
+		<div class="collapse navbar-collapse" id="bs-sidebar-navbar-collapse-1">
+			<ul class="nav navbar-nav">
+				<!--表示関連-->
+				<li class="dropdown">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown">View <span class="caret"></span></a>
+					<ul class="dropdown-menu forAnimate" role="menu">
+						<li><a style="color:#aaa;">座標</a></li>
+						<li class="divider"></li>
+						<li><a href="#" onclick="ChangeDstView()">距離</a></li>
+						<li class="divider"></li>
+						<li><a style="color:#aaa;">マップ</a></li>
+					</ul>
+				</li>
+				<!--オブジェクト関連-->
+				<li class="dropdown">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown">Object <span class="caret"></span></a>
+					<ul class="dropdown-menu forAnimate" role="menu">
+						<li><a href="#" onclick="RandLoc()">ランダム配置</a></li>
+						<li class="divider"></li>
+						<li><a href="#" onclick="DisableShootObjs()">クリア</a></li>
+					</ul>
+				</li>
+				<!--その他-->
+				<li class="dropdown">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown">Others <span class="caret"></span></a>
+					<ul class="dropdown-menu forAnimate" role="menu">
+						<li><a>超球半径</a><form><input type="range" min="20" max="100" value="30" onchange="ChangeRadius(this)"></form></li>
+						<li class="divider"></li>
+						<li><a>視界</a><form><input type="range" min="70" max="110" value="90" onchange="ChangeVRange(this)"></form></li>
+						<li class="divider"></li>
+						<li><a>視覚効果</a>
+							<form>
+								<input type="radio" name="decMode" onclick="ChangeDecMode(0)">なし 
+								<input type="radio" name="decMode" checked onclick="ChangeDecMode(1)">リニア 
+								<input type="radio" name="decMode" onclick="ChangeDecMode(2)">陰影
+							</form>
+						</li>
+					</ul>
+				</li>
+				<!--ヘルプ-->
+				<li data-toggle="modal" data-target="#helpModal"><a href="#">Help</a></li>
+			</ul>
+		</div>
+	</div>
+</nav>
+
+
+  <canvas id="glcanvas" width="1280" height="720" onscroll="event.preventDefault();">
+    このブラウザは
+    <code>&lt;canvas&gt;</code> 要素をサポートしていません。
+  </canvas>
+  <canvas id="canvas2d" width="1" height="1" onscroll="event.preventDefault();">
+    このブラウザは
+    <code>&lt;canvas&gt;</code> 要素をサポートしていません。
+  </canvas>
+  
+  <script id="shader-vs" type="x-shader/x-vertex">#version 300 es
+precision highp float;
+
+
+layout(location = 0) in vec3 vPosition;
+layout(location = 1) in vec3 vColor;
+
+layout(location = 2) in vec3 vPos1;
+layout(location = 3) in vec3 vPos2;
+layout(location = 4) in vec3 vPos3;
+
+layout(location = 5) in vec2 TXR1;
+layout(location = 6) in vec2 TXR2;
+layout(location = 7) in vec2 TXR3;
+
+
+uniform vec2 scl_rad;
+uniform vec3 objRot;
+uniform vec3 objStd;
+uniform vec3 locR;
+uniform vec4 WH_CR;
+uniform float revMd;
+
+//out vec3 vPos;
+//out vec2 txrG;
+uniform mat4 MVP;
+
+//-- geometry
+
+// new
+out vec4 fpNorm;	// 法線
+out float fn3Rt;
+out float fr;
+
+// old
+// out vec4 slopeC[3], betaC[3];
+// out vec2 s_b[3],	txr[3];
+out vec2 txr[3];
+out vec3 fCol;
+//out vec4 ptsE1, ptsE2, ptsE3;
+
+
+float PIE = 3.1415926535;
+
+
+//-----------------------------------
+void clcSlope4(vec4 drawP1, vec4 drawP2, out vec4 slopeC, out vec4 betaC);///ok
+void tudeRst(inout float, inout float, float, int);///ok
+void all_tudeRst_0(inout vec4 vect, vec3 locT);///ok
+void all_tudeRst_1(inout vec4 vect, vec3 locT);///ok
+vec4 tudeToEuc(vec3 locT);
+vec3 eucToTude(vec4 vecT);	 ///ok
+float pyth2(float x, float y);
+float pyth3(float x, float y, float z);
+float atan2(float x, float y);
+float pyth4(vec4 vec);
+//-----------------------------------
+
+
+float pyth4(vec4 vec){
+	 return sqrt( vec.x*vec.x +vec.y*vec.y +vec.z*vec.z +vec.w*vec.w ); 
+}///ok
+void clcSlope4(vec4 drawP1, vec4 drawP2, out vec4 slopeC, out vec4 betaC)///ok
+{	///-- 4次元直線の傾きを計算
+	///--
+	
+	//	adjY4(&drawP1, gen1);	//--値調整
+	slopeC.x = (drawP1.x-drawP2.x)/(drawP1.y-drawP2.y);
+	slopeC.z = (drawP1.z-drawP2.z)/(drawP1.y-drawP2.y);
+	slopeC.w = (drawP1.w-drawP2.w)/(drawP1.y-drawP2.y);
+	betaC.x = drawP1.x-(slopeC.x*drawP1.y);
+	betaC.z = drawP1.z-(slopeC.z*drawP1.y);
+	betaC.w = drawP1.w-(slopeC.w*drawP1.y);
+}
+void tudeRst(inout float vec_1, inout float vec_2, float locT, int mode)///ok
+{//-- 緯,経,深リセット回転
+	float tRot = atan2(vec_1, vec_2);
+	float R = pyth2(vec_1, vec_2);
+	if(0==mode){
+		vec_1 = R * sin(tRot - locT);
+		vec_2 = R * cos(tRot - locT);
+	}else{
+		vec_1 = R * sin(tRot + locT);
+		vec_2 = R * cos(tRot + locT);
+	}
+}
+void all_tudeRst_0(inout vec4 vect, vec3 locT)///ok
+{//-- 緯,経,深リセット回転
+		tudeRst(vect.x, vect.y, locT.x, 0);//-- X-Y 回転
+		tudeRst(vect.y, vect.z, locT.y, 0);//-- Y-Z 回転
+		tudeRst(vect.z, vect.w, locT.z, 0);//-- Z-W 回転
+}
+void all_tudeRst_1(inout vec4 vect, vec3 locT)///ok
+{//-- 緯,経,深リセット回転
+		tudeRst(vect.z, vect.w, locT.z, 1);//-- Z-W 回転
+		tudeRst(vect.y, vect.z, locT.y, 1);//-- Y-Z 回転
+		tudeRst(vect.x, vect.y, locT.x, 1);//-- X-Y 回転
+}
+
+vec4 tudeToEuc(vec3 locT){	// [緯,経,深]座標を[XYZ]W座標に変換
+	vec4 vecT = vec4( 
+				 sin(locT.z) * sin(locT.y) * sin(locT.x),//X
+				 sin(locT.z) * sin(locT.y) * cos(locT.x),//Y
+				 sin(locT.z) * cos(locT.y),		//Z
+				 cos(locT.z)	//W
+	);
+	return vecT;
+}
+vec3 eucToTude(vec4 vecT){	 ///ok
+	vec3 locT;
+	locT.x = atan2(vecT.x, vecT.y);								
+	locT.y = atan2(pyth2(vecT.x,vecT.y), vecT.z);	
+	locT.z = atan2(pyth3(vecT.x,vecT.y,vecT.z), vecT.w);
+
+	return locT;
+}
+float pyth2(float x, float y){ return sqrt(pow(x,2.0)+pow(y,2.0)); }///ok
+float pyth3(float x, float y, float z){ return sqrt(pow(x,2.0)+pow(y,2.0)+pow(z,2.0)); }///ok
+float atan2(float x, float y){///ok
+	float deg = atan(x / y); deg += PIE*float(y<0.0);
+	if(x==0.0){
+		deg = 0.0; deg += PIE*float(y<0.0);
+	}
+	if(y==0.0){
+		deg = 0.5*PIE; deg += PIE*float(x<0.0);
+	}
+	return deg;
+}
+
+void setVertex(inout vec3 vPos)
+{
+		vec4 pts1 = vec4(	// 始点 XYZW
+			0.0,
+			sin(scl_rad[0] * vPos.z / scl_rad[1]),
+			0.0,
+			cos(scl_rad[0] * vPos.z / scl_rad[1])
+		);
+		tudeRst(pts1.z, pts1.y, vPos.y, 1);	// 角度1
+		tudeRst(pts1.x, pts1.z, vPos.x, 1);	// 角度2
+
+		///-- 自転の反映
+		tudeRst(pts1.x, pts1.y, objRot.z, 1);	// 角度3
+		tudeRst(pts1.y, pts1.z, objRot.y, 1);	// 角度2
+		tudeRst(pts1.x, pts1.z, objRot.x, 1);	// 角度1
+
+		///-- 基準(回転)に合わせる
+		tudeRst(pts1.x, pts1.y, objStd[2], 1);	// 方向3
+		tudeRst(pts1.y, pts1.z, objStd[1], 1);	// 方向2
+		tudeRst(pts1.x, pts1.y, objStd[0], 1);	// 方向1
+		///-- オブジェクト座標に合わせる
+		all_tudeRst_1(pts1, locR);	// 方向3
+		//---- 座標変換して格納 (end ----
+		vPos = eucToTude(pts1); // 同次4Dベクトルに変換します。覚えていますか？
+	
+}
+
+//--------------=============================
+//--------------=============================
+//--------------=============================
+
+
+
+void main()
+{
+	vec3 vPosX = vPosition;
+	vec2 txrG[3]  = vec2[](TXR1, TXR2, TXR3);
+	vec3 vPos[3] = vec3[](vPos1, vPos2, vPos3);
+	
+
+	for(int i=0;i<3;i++)
+		setVertex(vPos[i]);
+	
+	setVertex(vPosX);
+	
+	
+	vec3 drawPts = tudeToEuc(vPosX).xyz;
+	tudeRst(drawPts.y, drawPts.z, 0.5*PIE, 1); //-- Y軸を奥行きに (互換のため)
+	drawPts.z *= -1.0;
+	
+	//------------------------------------------------
+	// ▼ジオメトリシェーダで行っていた処理▼
+	//--------------------------------
+	
+	//--まず色設定
+	fCol = vColor;
+	vec4 a = /* ptsE1 =  */tudeToEuc( vPos[0] );
+	vec4 b = /* ptsE2 =  */tudeToEuc( vPos[1] );
+	vec4 c = /* ptsE3 =  */tudeToEuc( vPos[2] );
+	//-- テスクチャ
+	txr[0] = txrG[0];
+	txr[1] = txrG[1];
+	txr[2] = txrG[2];
+	//--
+
+	///-- 点情報コピー, EUC座標に変換, Y-Z軸間で90度回転, Z軸を反転
+	vec3 drawPt[3], drawPt_td[3];
+	vec4 drawP4[3];
+	for(int j=0;j<3;j++){	
+		drawPt_td[j] = vPos[j];
+		drawP4[j] = tudeToEuc(drawPt_td[j]);
+		drawPt[j] = drawP4[j].xyz;
+			
+		tudeRst(drawPt[j].y, drawPt[j].z, 0.5*PIE, 1); //-- Y軸を奥行きに (互換のため)
+		drawPt[j].z *= -1.0;
+	}
+	////---計算のために値yを調整 > さらにカメラ前面の線分を切り出す ---///
+	//bool nRev = adjY_pls(drawPt);
+
+//////////////////////////////////aaaa
+	/// ベクトル積(垂直)
+	vec4 prod = vec4
+	(
+		-a[1]*b[2]*c[3] -a[2]*b[3]*c[1] -a[3]*b[1]*c[2] 
+		+a[1]*b[3]*c[2] +a[2]*b[1]*c[3] +a[3]*b[2]*c[1],
+
+		+a[0]*b[2]*c[3] +a[2]*b[3]*c[0] +a[3]*b[0]*c[2]
+		-a[0]*b[3]*c[2] -a[2]*b[0]*c[3] -a[3]*b[2]*c[0],
+
+		-a[0]*b[1]*c[3] -a[1]*b[3]*c[0] -a[3]*b[0]*c[1]
+		+a[0]*b[3]*c[1] +a[1]*b[0]*c[3] +a[3]*b[1]*c[0],
+
+		+a[0]*b[1]*c[2] +a[1]*b[2]*c[0] +a[2]*b[0]*c[1]
+		-a[0]*b[2]*c[1] -a[1]*b[0]*c[2] -a[2]*b[1]*c[0]
+	);
+	float prodRate = pyth4(prod);
+	fpNorm = prod*(1.0/prodRate);
+	fn3Rt = 1.0/pyth3(fpNorm.x, fpNorm.y, fpNorm.z);
+	
+	
+	fr = revMd;
+////////////////////////////////////////aaaa
+	
+	//-- 半周以上
+	//if(drawPt[0].y<0 || drawPt[1].y<0 || drawPt[2].y<0){
+	drawPts *= revMd;
+	gl_Position = MVP * vec4(drawPts, 1.0);
+
+}
+
+</script>
+  <script id="shader-fs" type="x-shader/x-fragment">#version 300 es
+precision highp float;
+
+// Ouput data
+out vec4 color;
+
+// in vec2 s_b[3],	txr[3];
+// in vec4 slopeC[3], betaC[3];
+
+in vec2 txr[3];
+in vec3 fCol;
+//in vec4 ptsE1, ptsE2, ptsE3;
+
+// 面が属する球体に対する法線
+in vec4 fpNorm;
+in float fn3Rt;
+in float fr;
+
+uniform vec4 WH_Cr;
+uniform vec3 sLoc;
+uniform sampler2D sfTex;
+uniform int texJD;
+uniform int decMode;
+uniform int sunJD;
+
+float PIE = 3.1415926535;
+
+//-----------------------------------
+vec4 getTude(float scX, float scY, vec4 slopeC, vec4 betaC);///ok
+void clcSlope4(vec4 drawP1, vec4 drawP2, out vec4 slopeC, out vec4 betaC);///ok
+void tudeRst(inout float, inout float, float, int);///ok
+void all_tudeRst_0(inout vec4 vect, vec3 locT);///ok
+void all_tudeRst_1(inout vec4 vect, vec3 locT);///ok
+vec3 eucToTude(vec4 vecT);	 ///ok
+float pyth2(float x, float y);
+float pyth3(float x, float y, float z);
+float pyth3(vec3 vec);
+float pyth4(vec4 vec);
+float atan2(float x, float y);
+float pow2(float val);
+
+//-----------------------------------
+
+vec4 getTude(float scX, float scY, vec4 slopeC, vec4 betaC){///ok
+	///--交点を求める
+	float xa = (scX - 0.5*WH_Cr.x);
+	float ya = (scY - 0.5*WH_Cr.y) +0.0000000000000000000000001;
+	float slopeV = xa/ya;	//-- xに対するyの増加量
+	float crossY = betaC.x/(slopeV-slopeC.x);
+
+	vec4 crossPt = vec4(	slopeC.x * crossY + betaC.x,
+						crossY,
+						slopeC.z * crossY + betaC.z,
+						slopeC.w * crossY + betaC.w);
+
+	float scale = pyth4(crossPt);
+	crossPt = (1.0/scale)*crossPt;
+
+	return crossPt;
+}
+void clcSlope4(vec4 drawP1, vec4 drawP2, out vec4 slopeC, out vec4 betaC)///ok
+{	///-- 4次元直線の傾きを計算
+	///--
+	
+	slopeC.x = (drawP1.x-drawP2.x)/(drawP1.y-drawP2.y);
+	slopeC.z = (drawP1.z-drawP2.z)/(drawP1.y-drawP2.y);
+	slopeC.w = (drawP1.w-drawP2.w)/(drawP1.y-drawP2.y);
+	betaC.x = drawP1.x-(slopeC.x*drawP1.y);
+	betaC.z = drawP1.z-(slopeC.z*drawP1.y);
+	betaC.w = drawP1.w-(slopeC.w*drawP1.y);
+}
+void tudeRst(inout float vec_1, inout float vec_2, float locT, int mode)///ok
+{//-- 緯,経,深リセット回転
+	float tRot = atan2(vec_1, vec_2);
+	float R = pyth2(vec_1, vec_2);
+	if(0==mode){
+		vec_1 = R * sin(tRot - locT);
+		vec_2 = R * cos(tRot - locT);
+	}else{
+		vec_1 = R * sin(tRot + locT);
+		vec_2 = R * cos(tRot + locT);
+	}
+}
+float pyth2(float x, float y){ return sqrt(pow2(x)+pow2(y)); }///ok
+float pyth3(float x, float y, float z)
+{ 
+	return sqrt(x*x + y*y + z*z); 
+}///ok
+float pyth3(vec3 vec)
+{ 
+	return sqrt(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z); 
+}///ok
+float pyth3ae(vec3 vec)
+{
+	return sqrt( 1.0 - (vec.x*vec.x + vec.y*vec.y + vec.z*vec.z) );
+}
+float pyth4(vec4 vec){
+	 return sqrt( vec.x*vec.x +vec.y*vec.y +vec.z*vec.z +vec.w*vec.w ); 
+}///ok
+float atan2(float x, float y){///ok
+	float deg = atan(x / y); deg += PIE*float(y<0.0);
+	if(x==0.0){
+		deg = 0.0; deg += PIE*float(y<0.0);
+	}
+	if(y==0.0){
+		deg = 0.5*PIE; deg += PIE*float(x<0.0);
+	}
+	return deg;
+}
+float pow2(float val){
+	return val * val;
+}
+vec3 eucToTude(vec4 vecT){	 ///ok
+	vec3 locT;
+	locT.x = atan2(vecT.x, vecT.y);								
+	locT.y = atan2(pyth2(vecT.x,vecT.y), vecT.z);	
+	locT.z = atan2(pyth3(vecT.x,vecT.y,vecT.z), vecT.w);
+
+	return locT;
+}
+
+
+
+
+
+//----------------------------------------
+void main()
+{
+	vec2 gl = vec2(gl_FragCoord.x, gl_FragCoord.y);
+
+
+
+	// 面属球法線から深度を導く//
+
+	// 視線方向の傾きを計算
+	float gzX = ((gl.x/WH_Cr.x - 0.5)*2.0*WH_Cr.z);
+	float gzY = ((gl.y/WH_Cr.y - 0.5)*2.0*WH_Cr.w);
+	float gzZ = 1.0;
+	float gzRate0 = pyth3(gzX, gzY, gzZ);
+	vec3 gaze = vec3(gzX, gzY, gzZ) / gzRate0;	// 再考不要
+
+
+	// 軸方向に対する内積(xyz)
+	vec3 fpNorm3 = fpNorm.xyz*fn3Rt;
+	float gzRate = dot(fpNorm3, gaze);	
+	// float ngDstHf = pyth3((fpNorm3-gaze)*0.5);
+	// float gzRate = 1.0 - 2.0 * ngDstHf * ngDstHf;	// 2倍角の公式
+	vec3 gzXtnd = gaze + fpNorm3*gzRate*(1.0/fpNorm.w-1.0);	// 引き延ばし
+	float gzXtScale = pyth3(gzXtnd);//
+	vec3 xt = gzXtnd*(1.0/gzXtScale);
+	// 元に縮める
+	xt += fpNorm3 * gzRate * (1.0/(fpNorm.w*gzXtScale)) * (fpNorm.w-1.0);
+	// wの符号算出
+	float xSign = -1.0*(float(0.0<fpNorm.w)*2.0-1.0)*(float(0.0<gzRate)*2.0-1.0);
+	vec4 curEc = vec4(xt, xSign * pyth3ae(xt)) * fr;
+	
+	// 面属球法線との内積が0であれば問題なし
+	/*float ckHf = pyth4((fpNorm-curEc)*0.5);
+	if(0.5<abs(1.0 - 2.0 * ckHf * ckHf)) curEc = vec4(gaze, 0)*fr;*/
+	if(isnan(curEc.w)) curEc = vec4(gaze, 0)*fr;
+	//-------
+	float dec;
+	vec3 curTd = eucToTude( curEc );
+	// if(curTd.y<0.5*PIE) dec = (PIE-curTd.z*0.5) /PIE; else dec = curTd.z*0.5 /PIE;
+	if(curEc.z>0.0) dec = (3.0+curEc.w)*0.25; else dec = (1.0-curEc.w)*0.25;
+	///--
+	gl_FragDepth = 1.001-dec;
+	
+	
+	vec3 oCol = fCol;
+	if(decMode == 0)
+		dec = 1.0;
+	
+	color = vec4(oCol*dec, 1.0);
+	
+	if(decMode != 2)
+		return;
+	///------ Lighting ------▼///
+
+	// ベクトル積から法線算出
+	float Lu1L = pyth3( curEc.xyz );
+	vec3 Lu1 = (1.0/Lu1L) * curEc.xyz;
+	float Lu2L = curEc.w;
+	float Lu2 = 1.0;
+	vec4 lVec = vec4(Lu2L *Lu1, -1.0 *Lu1L *Lu2);
+
+	// 法線との角度
+	float nDeg = abs(dot(lVec, fpNorm));
+
+	//...
+	//-- 輝度を算出
+	float bright_ = 0.2*nDeg / ( curEc.x*curEc.x + curEc.y*curEc.y + curEc.z*curEc.z );// 旧
+	float bright;
+	if(curTd.y<0.5*PIE) bright = 1.2 / ( curTd.z*curTd.z ); else bright = 1.2 / ( (2.0*PIE-curTd.z)*(2.0*PIE-curTd.z) );
+	if(2.0<bright) bright = 2.0;	//最大輝度
+	bright = bright*nDeg;
+
+	///-- Lighting_(end ▲
+	color = vec4(oCol*bright, 1.0);
+}
+
+</script>
+  <script id="points-vs" type="x-shader/x-vertex">#version 300 es
+precision mediump float;
+
+// Input vertex data, different for all executions of this shader.
+layout(location = 0) in vec3 vPosition;
+//layout(location = 1) in vec3 vColor;
+
+uniform vec2 scl_rad;
+uniform vec3 objRot;
+uniform vec3 objStd;
+uniform vec3 locR;
+uniform vec4 WH_CR;
+
+out float DEC;
+//out vec3 fColor;
+float PIE = 3.1415926535;
+
+
+//-----------------------------------
+vec4 getTude(float scX, float scY, vec4 slopeC, vec4 betaC);///ok
+void clcSlope4(vec4 drawP1, vec4 drawP2, out vec4 slopeC, out vec4 betaC);///ok
+void tudeRst(inout float, inout float, float, int);///ok
+void all_tudeRst_0(inout vec4 vect, vec3 locT);///ok
+void all_tudeRst_1(inout vec4 vect, vec3 locT);///ok
+vec3 eucToTude(vec4 vecT);	 ///ok
+float pyth2(float x, float y);
+float pyth3(float x, float y, float z);
+float atan2(float x, float y);
+
+//-----------------------------------
+
+void tudeRst(inout float vec_1, inout float vec_2, float locT, int mode)///ok
+{//-- 緯,経,深リセット回転
+	float tRot = atan2(vec_1, vec_2);
+	float R = pyth2(vec_1, vec_2);
+	if(0==mode){
+		vec_1 = R * sin(tRot - locT);
+		vec_2 = R * cos(tRot - locT);
+	}else{
+		vec_1 = R * sin(tRot + locT);
+		vec_2 = R * cos(tRot + locT);
+	}
+}
+void all_tudeRst_1(inout vec4 vect, vec3 locT)///ok
+{//-- 緯,経,深リセット回転
+		tudeRst(vect.z, vect.w, locT.z, 1);//-- Z-W 回転
+		tudeRst(vect.y, vect.z, locT.y, 1);//-- Y-Z 回転
+		tudeRst(vect.x, vect.y, locT.x, 1);//-- X-Y 回転
+}
+vec3 eucToTude(vec4 vecT){	 ///ok
+	vec3 locT;
+	locT.x = atan2(vecT.x, vecT.y);								
+	locT.y = atan2(pyth2(vecT.x,vecT.y), vecT.z);	
+	locT.z = atan2(pyth3(vecT.x,vecT.y,vecT.z), vecT.w);
+
+	return locT;
+}
+float pyth2(float x, float y){ return sqrt(pow(x,2.0)+pow(y,2.0)); }///ok
+float pyth3(float x, float y, float z){ return sqrt(pow(x,2.0)+pow(y,2.0)+pow(z,2.0)); }///ok
+float atan2(float x, float y){///ok
+	float deg = atan(x / y); deg += PIE*float(y<0.0);
+	if(x==0.0){
+		deg = 0.0; deg += PIE*float(y<0.0);
+	}
+	if(y==0.0){
+		deg = 0.5*PIE; deg += PIE*float(x<0.0);
+	}
+	return deg;
+}
+
+
+
+void main(){
+
+	vec4 pts1 = vec4(	// 始点 WXYZ
+		0,
+		sin(scl_rad[0] * vPosition.z / scl_rad[1]),
+		0,
+		cos(scl_rad[0] * vPosition.z / scl_rad[1])
+	);
+	tudeRst(pts1.z, pts1.y, vPosition.y, 1);	// 角度1
+	tudeRst(pts1.x, pts1.z, vPosition.x, 1);	// 角度2
+
+	///-- 自転の反映
+	tudeRst(pts1.x, pts1.y, objRot.z, 1);	// 角度3
+	tudeRst(pts1.y, pts1.z, objRot.y, 1);	// 角度2
+	tudeRst(pts1.x, pts1.z, objRot.x, 1);	// 角度1
+
+	///-- 基準(回転)に合わせる
+	tudeRst(pts1.x, pts1.y, objStd[2], 1);	// 方向3
+	tudeRst(pts1.y, pts1.z, objStd[1], 1);	// 方向2
+	tudeRst(pts1.x, pts1.y, objStd[0], 1);	// 方向1
+	///-- オブジェクト座標に合わせる
+	all_tudeRst_1(pts1, locR);	// 方向3
+	//---- 座標変換して格納 (end ----
+    vec3 curPt = eucToTude(pts1); // 同次4Dベクトルに変換します。覚えていますか？
+	
+	
+		float length = tan(curPt.y);
+		float scX = length * sin(curPt.x);
+		float scY = length * cos(curPt.x);
+		scX = scX/WH_CR.z;
+		scY = scY/WH_CR.w;
+
+		
+		float dec;
+		if(curPt.y<0.5*PIE) dec = (PIE-curPt.z*0.5) /PIE; else dec = curPt.z*0.5 /PIE;
+		DEC = dec;
+
+		gl_Position = vec4(scX, scY, 0, 1);
+		gl_PointSize = 2.0;
+
+	//fColor = vColor;
+
+}
+
+</script>
+  <script id="points-fs" type="x-shader/x-fragment">#version 300 es
+precision mediump float;
+
+// Ouput data
+//in vec3 fCol;
+in float DEC;
+out vec4 color;
+float PIE = 3.1415926535;
+
+
+//----------------------------------------
+void main()
+{
+	
+	gl_FragDepth = 1.01-DEC;
+	color = vec4(1.0*DEC,1.0*DEC,1.0*DEC,1);
+
+}
+</script>
+
+ <div id="info"> 
+	<div style="color:#fff;">超球面遊泳シミュレータ for web ...version 0.30</div>
+ </div>
+
+<!-- モーダル・ダイアログ -->
+<div class="modal fade" id="helpModal" tabindex="-1">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal"><span>×</span></button>
+				<h4 class="modal-title">操作方法</h4>
+			</div>
+			<div class="modal-body">
+				<table>
+					<tr><td>・マウスドラッグ</td><td>カメラ視点移動</td></tr>
+					<!--tr><td>・[Shift]キー + マウスドラッグ</td><td>上下左右の移動</td></tr-->
+					<tr><td>・[W],[A],[S],[D]キー</td><td>上下左右の移動</td></tr>
+					<tr><td>・マウスホイール</td><td>視点を維持したカメラ回転</td></tr>
+					<tr><td>・( [Shift]キー + ) [Space]キー</td><td>前後の移動</td></tr>
+					<tr><td>・[1]キー</td><td>オブジェクトの一時停止/再開</td></tr>
+					<tr><td>・[2]キー</td><td>前方にオブジェクト発射</td></tr>
+					<tr><td>・[3]キー</td><td>プレイヤー速度変更</td></tr>
+					<!--tr><td></td><td></td></tr>
+					<tr><td></td><td></td></tr>
+					<tr><td></td><td></td></tr-->
+				</table> 
+				<br>2020/11/23時点の最新版chrome/firefox/operaで動作確認
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" data-dismiss="modal">閉じる</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+</body>
+
+</html>
