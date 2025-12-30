@@ -1,38 +1,31 @@
-@charset  "utf-8"
+@charset "utf-8";
 
-html
-{
-}
+html {}
 
-body
-{
+body {
 	background: linear-gradient(45deg, #dadada, transparent);
 }
 
-.worksImg{
+.worksImg {
 	width: 320px;
 }
 
-#header
-{
+#header {
 	font-size: 20px;
 }
 
-.column
-{
+.column {
 	background: linear-gradient(45deg, #dadada, transparent);
 	padding: 8px;
 	margin-bottom: 5px;
 }
 
-.headerB
-{
+.headerB {
 	background: linear-gradient(45deg, #dadada, transparent);
 	padding: 4px;
 }
 
-#whole
-{
+#whole {
 	background-color: #fff;
 	max-width: 800px;
 	margin: auto;
@@ -41,4 +34,3 @@ body
 	border-right: solid 1px #ddd;
 
 }
-
