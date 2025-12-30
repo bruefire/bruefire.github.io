@@ -567,7 +567,7 @@ function obGet(uni, num){//, ts){
 				//obGetSW = false;
 			}
 		}
-		xmlHttp.open("GET", 'obget.php?uni='+uni, true);		//----必要なtxtを取得
+		xmlHttp.open("GET", 'obj/'+uni, true);		//----必要なtxtを取得
 		xmlHttp.send(null);
 	 }
 }
